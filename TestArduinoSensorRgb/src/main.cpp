@@ -6,14 +6,14 @@
 Adafruit_TCS34725 sensor = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_614MS, TCS34725_GAIN_1X);
 
 float valor_calibracao = 21.34; // Fator de calibração
-
-int contagem = 0;      // Variável de contagem
+extern volatile unsigned long zero_millis;
+int contagem = 0;
 float soma_tensao = 0; // Variável para soma de tensão
 float media = 0;       // Variável que calcula a media
 float entrada_A0;      // Variável de leitura do pino A0
 float tensao;
-float t = millis();
 float tempo;
+float t;
 
 void setup(void)
 {
@@ -48,27 +48,42 @@ void loop(void)
   sensor.getRawData(&r, &g, &b, &c);
   ColorTemp = sensor.calculateColorTemperature(r, g, b);
   Lux = sensor.calculateLux(r, g, b);
-  tempo = (float)t / 1000.;
+
   if (c < 5000)
   {
-    while (400 < r < 900) // temporario ate saber o intervalo
+    while (!(400 < r < 900)) // temporario ate saber o intervalo
     {
       while (contagem < 10)
       {                                       // Executa enquanto contagem menor que 10
-        tempo = millis();                     // Define o tempo em microssegundossrc/main.cpp
+        tempo = millis() + t;                     // Define o tempo em microssegundossrc/main.cpp
         entrada_A0 = analogRead(A0);          // Lê a entrada analógica
         tensao = (entrada_A0 * 5.0) / 1024.0; // Converte em tensão, o valor lido
         soma_tensao = (soma_tensao + tensao); // Soma a tensão anterior com a atual
         contagem++;                           // Soma 1 à variável de contagem
         delay(100);                           // Aguarda para próxima leitura
       }
-      t = (float)tempo / 1000.;
+      t = tempo;
+      tempo_seg = (float)tempo * 0.001;
       media = soma_tensao / 10;
       float valor_pH = -5.70 * media + valor_calibracao;
+      Serial.print(tempo_seg);
+      Serial.print(",");
+      Serial.print(valor_pH);
+      
+
       //passo os resultados pro excell
       contagem = 0;
     }
 
   }else {
     Serial.print("O sensor RGB esta saturado")
+  }
+
+  void zeraTempo(){
+    noInterrupts();
+      zero_millis = 0;
+      interrupts();
+    
+
+
   }
