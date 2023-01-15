@@ -14,12 +14,17 @@ float soma_tensao = 0; // Variável para soma de tensão
 float media = 0;       // Variável que calcula a media
 float entrada_A0;      // Variável de leitura do pino A0
 float tensao;
-time_t tempoInicial = 0;
-time_t tempoFinal;
-time_t t;
-time_t tempoMedio;
+// time_t tempoInicial = 0;
+// time_t tempoFinal;
+// time_t t = now();
+// time_t tempoMedio;
+unsigned long tempo1;
+unsigned long tempo2;
+unsigned long tempoFinal = 0;
+int segundos = 0;
+int minutos = 0;
+float valor_ph;
 String valor_str = "<";
-
 
 void setup(void)
 {
@@ -59,51 +64,60 @@ void loop(void)
   int rosa = 5000;
   int lilas = 200;
 
-
   if (c < 5000)
   {
-   
-    while (!( lilas < r && r < rosa)) // temporario ate saber o intervalo
-    {
+    exibirDados(tempoFinal, valor_ph); //gravar dados
 
-      Serial.print("Vermelho : "); Serial.print(r); Serial.print(" ");
-      while (contagem < 10)
-      {                                       // Executa enquanto contagem menor que 10
-        t = minute(t);                                     
+    while (!(lilas < r && r < rosa)) // temporario ate saber o intervalo
+    {
+      tempo1 = millis();  
+      while (contagem < 10) // Executa enquanto contagem menor que 10
+      {
         entrada_A0 = analogRead(A0);          // Lê a entrada analógica
         tensao = (entrada_A0 * 5.0) / 1024.0; // Converte em tensão, o valor lido
         soma_tensao = (soma_tensao + tensao); // Soma a tensão anterior com a atual
         contagem++;                           // Soma 1 à variável de contagem
-        delay(100);                           // Aguarda para próxima leitura
+        delay(100);
+        // Aguarda para próxima leitura
       }
-      tempoMedio = minute(tempoMedio) - t;
-      tempoFinal = tempoMedio;
-
+      tempo2 = millis();
+      // tempoFinal = tempoMedio - tempoInicial;
       media = soma_tensao / 10;
-      float valor_ph = -5.70 * media + valor_calibracao;
-      Serial.print(tempoFinal);
-      Serial.print(";");
-      Serial.println(valor_ph);
-      tempoInicial = tempoInicial + tempoMedio;
+      valor_ph = -5.70 * media + valor_calibracao;
+
+      // tempoInicial = tempoInicial + tempoMedio;
+      tempoFinal =  tempo2 - tempo1;
+      exibirDados(tempoFinal, valor_ph); //gravar dados
       sensorCor.getRawData(&r, &g, &b, &c);
-   
+
       // valor_str.concat(tempo_seg);
       //  valor_str.concat(",");
-      //valor_str.concat(valor_ph);
-    
-      
+      // valor_str.concat(valor_ph);
+
       // passo os resultados pro excell
       contagem = 0;
       delay(5000);
-     
     }
     Serial.print("Analise Concluida");
     delay(3000);
     noInterrupts();
   }
-  
+
   else
   {
     Serial.print("O sensor RGB esta saturado");
+  }
+  void exibirDados(long tempoFinal float valor_ph)
+  {
+    minutos = ((tempoFinal / 1000) / 60);
+    segundos = ((tempoFinal/1000) % 60);
+    Serial.print(minutos);
+    Serial.print(":");
+    if (segundos < 10){
+      Serial.print("0");
+    }
+    Serial.print(segundos);
+    Serial.print(";");
+    Serial.println(valor_ph);
   }
 }
