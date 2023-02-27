@@ -3,6 +3,9 @@
 #include <Wire.h>
 #include "Adafruit_TCS34725.h"
 #include <TimeLib.h>
+#include <ArduinoSTL.h>
+#include <list>
+
 // LiquidCrystal_I2C lcd(0x27,20,4);
 Adafruit_TCS34725 sensorCor = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_614MS, TCS34725_GAIN_1X);
 
@@ -10,67 +13,49 @@ float valor_calibracao = 21.34; // Fator de calibração
 extern volatile unsigned long zero_millis;
 int contagem = 0;
 int LABEL = 1;
-float soma_tensao = 0; // Variável para soma de tensão
-float media = 0;       // Variável que calcula a media
-float entrada_A0;      // Variável de leitura do pino A0
+std::list<String> listaDados;
+float entrada_A0; // Variável de leitura do pino A0
 float tensao;
-// time_t tempoInicial = 0;
-// time_t tempoFinal;
-// time_t t = now();
-// time_t tempoMedio;
-unsigned long tempo1;
-unsigned long tempo2;
-unsigned long tempoFinal = 0;
-int segundos = 0;
-int minutos = 0;
-float valor_ph;
-String valor_str = "<";
+byte valorTela = 0;
+String dadosJuntos;
+int menu;
 
-void setup(void)
+void exibirDados(String dadosJuntos)
 {
-  Serial.begin(9600);
-  Serial.println("CLEARDATA");
-  Serial.println("LABEL, tempo_seg, valor_ph");
-  // lcd.init();
-  // lcd.begin(16,2);
-
-  // lcd.backlight();
-  // lcd.setCursor(0,0);
-  // lcd.print("Estado:");
-  if (sensorCor.begin())
-  {
-    Serial.print("");
-    // lcd.setCursor(0,8);
-    // lcd.print("Ok!");
-  }
-  else
-  {
-    Serial.println("Dispositivos não encontrado...");
-    // lcd.setCursor(0,8);
-    // lcd.print("Fail!");
-    while (1)
-      ;
-  }
+  Serial.println(dadosJuntos);
+}
+void limparMonitorSerial() {
+  Serial.flush(); // Descarta todos os dados na saída serial
+  Serial.write(27); // Envia o caractere de escape
+  Serial.print("[2J"); // Envia a sequência de escape para limpar a tela
+  Serial.write(27); // Envia o caractere de escape
+  Serial.print("[H"); // Envia a sequência de escape para posicionar o cursor no início da tela
 }
 
-void loop(void)
+String medicao()
 {
+  String dadosTempo;
+  int segundos = 0;
+  int minutos = 0;
+  float soma_tensao = 0; // Variável para soma de tensão
+  float media = 0;
+  float valor_ph = 0;
+  unsigned long tempo1;
+  unsigned long tempo2;
+  unsigned long tempoFinal = 0;
   soma_tensao = 0; // Inicia soma_tensão em 0
-  contagem = 0;
+  int contagem = 0;
   uint16_t r, g, b, c, ColorTemp, Lux;
   sensorCor.getRawData(&r, &g, &b, &c);
   ColorTemp = sensorCor.calculateColorTemperature(r, g, b);
   Lux = sensorCor.calculateLux(r, g, b);
   int rosa = 5000;
   int lilas = 200;
-
   if (c < 5000)
   {
-    exibirDados(tempoFinal, valor_ph); //gravar dados
-
     while (!(lilas < r && r < rosa)) // temporario ate saber o intervalo
     {
-      tempo1 = millis();  
+      tempo1 = millis();
       while (contagem < 10) // Executa enquanto contagem menor que 10
       {
         entrada_A0 = analogRead(A0);          // Lê a entrada analógica
@@ -86,19 +71,30 @@ void loop(void)
       valor_ph = -5.70 * media + valor_calibracao;
 
       // tempoInicial = tempoInicial + tempoMedio;
-      tempoFinal =  tempo2 - tempo1;
-      exibirDados(tempoFinal, valor_ph); //gravar dados
-      sensorCor.getRawData(&r, &g, &b, &c);
+      tempoFinal = ((tempo2 - tempo1) + tempoFinal);
+      minutos = ((tempoFinal / 1000) / 60);
+      segundos = ((tempoFinal / 1000) % 60);
+      if (segundos < 10)
+      {
+        dadosJuntos = minutos + ':' + '0' + segundos + ';' + valor_ph;
+      }
+      else
+      {
+        dadosJuntos = minutos + ':' + segundos + ';' + valor_ph;
+      }
 
-      // valor_str.concat(tempo_seg);
-      //  valor_str.concat(",");
-      // valor_str.concat(valor_ph);
-
-      // passo os resultados pro excell
+      listaDados.push_back(dadosJuntos);
+      return dadosJuntos;
       contagem = 0;
       delay(5000);
     }
-    Serial.print("Analise Concluida");
+    Serial.println("Analise Concluida, coloração alcançada");
+    Serial.println("----------------------------------Estes são os dados Coletados:----------------------------------");
+    for (auto elemento : listaDados)
+    {
+      Serial.println(elemento);
+    }
+
     delay(3000);
     noInterrupts();
   }
@@ -107,17 +103,74 @@ void loop(void)
   {
     Serial.print("O sensor RGB esta saturado");
   }
-  void exibirDados(long tempoFinal float valor_ph)
+}
+
+void setup(void)
+{
+  Serial.begin(9600);
+  Serial.println("CLEARDATA");
+  Serial.println("LABEL, tempo_seg, valor_ph");
+  if (sensorCor.begin())
   {
-    minutos = ((tempoFinal / 1000) / 60);
-    segundos = ((tempoFinal/1000) % 60);
-    Serial.print(minutos);
-    Serial.print(":");
-    if (segundos < 10){
-      Serial.print("0");
+    Serial.print("");
+    Serial.println("Bem vindo ao medidor de PH e coloração");
+    // lcd.setCursor(0,8);
+    // lcd.print("Ok!");
+  }
+  else
+  {
+    Serial.println("Dispositivos não encontrado...");
+    // lcd.setCursor(0,8);
+    // lcd.print("Fail!");
+    while (1)
+      ;
+  }
+}
+
+void loop()
+{
+  byte valorTela = 0;
+  Serial.println("Escolha a opção:");
+  Serial.println("1 - Medir ph da solução");
+  Serial.println("2 - Exibir dados Coletados ");
+  Serial.println("3 - Encerrar Programa");
+
+  if (Serial.available() > 0)
+  {
+    valorTela = Serial.read();
+
+    if ((valorTela != '1') && (valorTela != '2') && (valorTela != '3'))
+    {
+      Serial.print("O numero digitado é incorreto:");
+      Serial.println((char)valorTela);
+      Serial.print("Digite Novamente:");
+      valorTela = Serial.read();
     }
-    Serial.print(segundos);
-    Serial.print(";");
-    Serial.println(valor_ph);
+    else
+    {
+      if (valorTela == '1')
+      {
+        listaPHT = medicao();
+        exibirDados(listaPHT);
+      }
+      else if (valorTela == '2')
+      {
+        limparMonitorSerial();
+        Serial.println("----------------------------------Estes são os dados Coletados:----------------------------------");
+        for (auto elemento : listaDados)
+        {
+          Serial.println(elemento);
+        }
+      }
+
+      else if (valorTela == '3')
+      {
+        Serial.print("Programa Finalizado!");
+        Serial.end();
+        while (true)
+        {
+        } // loop infinito para manter o programa encerrado
+      }
+    }
   }
 }
